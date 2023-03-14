@@ -6,7 +6,7 @@ from tensorflow.keras import layers
 import skimage.measure as skm
 from scipy.interpolate import griddata
 
-
+#Build CNN with desired architecture
 def BuildCNN(conv_layers,features,win_size,dense_layers,dense_size,dropout,initializer,regularizer=None,max_pool=None):
     model = tf.keras.Sequential()
     for i in range(conv_layers):
@@ -23,6 +23,7 @@ def BuildCNN(conv_layers,features,win_size,dense_layers,dense_size,dropout,initi
     model.add(layers.Dense(3, activation='softmax', kernel_initializer=initializer, kernel_regularizer=regularizer))
     return model
 
+#Build a fully-connected feedforward neural network with desired architecture
 def BuildANN(input_size,dense_layers,dense_size,dropout,initializer,regularizer=None):
     model = tf.keras.Sequential()
 
@@ -35,6 +36,7 @@ def BuildANN(input_size,dense_layers,dense_size,dropout,initializer,regularizer=
 
     return model
 
+#Train the model using SGD with a cross-entropy cost function
 def TrainModel(inputs,labels,model,no_of_epochs,bs,lr):
     model.compile(optimizer=tf.keras.optimizers.SGD(learning_rate=lr),
                   loss=tf.keras.losses.CategoricalCrossentropy(),
@@ -45,21 +47,30 @@ def TrainModel(inputs,labels,model,no_of_epochs,bs,lr):
     
     return trained_model, history
 
+#Save the model to the desired filepath
 def SaveModel(model,filepath):
     model.save(filepath);
     return None
 
+#Calculate the winding number around the edge of the ROIs
 def WindingPrediction(inputs):
+    #Initialise classification matrix
     winding_pred = np.zeros((np.size(inputs,0),3))
+    #Loop through ROIs
     for i in range(np.size(inputs,0)):
         t = inputs[i,:,:]; 
+        #Flatten edge of ROI into a column vector
         alpha_0 = np.concatenate((t[::-1,0],t[0,1:-1],t[:,-1],t[-1,-2:0:-1]))
+        #Find the change in angle between adjacent elements
         alpha_1 = np.roll(alpha_0,1)
+        #Correct any values that are not the shortest change in angle
         d_alpha = alpha_1 - alpha_0
         d_alpha[d_alpha<-np.pi/2] += np.pi
         d_alpha[d_alpha>np.pi/2] -= np.pi
+        #Sum these changes to get the total winding number
         winding = round(sum(d_alpha)/(2*np.pi),1)
         
+        #Update classification matrix
         if winding == -0.5:
             winding_pred[i,2] = 1
         elif winding == 0.5:
@@ -69,8 +80,11 @@ def WindingPrediction(inputs):
             
     return winding_pred
 
+#Use model to classify inputs
 def MLPrediction(inputs,model):
     ML_pred_prob = model.predict(inputs)
+    #Output of model.predict will be the probability each class is correct, take
+    #largest probability as the classification
     ML_pred = np.eye(3,dtype=int)[np.argmax(ML_pred_prob,axis=1)]
     
     return ML_pred
@@ -101,10 +115,13 @@ def EvaluateModel(train_inputs,train_labels,test_inputs,test_labels,model,no_of_
     training_performance = np.vstack((mean_accuracy,std_accuracy,mean_loss,std_loss))
     return test_accuracy,test_stats,training_performance
 
+#Saving detected defects, update pos_folder and neg_folder if different locations
+#are desired.
 def SaveDefects(filepath,pos_defs,neg_defs,image_num):
     
-    pos_folder = filepath + '/PosDefectFiles'
-    neg_folder = filepath + '/NegDefectFiles'    
+    pos_folder = filepath + '/PosDefects'
+    neg_folder = filepath + '/NegDefects'   
+    #Add a larger buffer of zeros if > 1e6 images are being processed
     filename = 'posdefects%06d.txt' % image_num
     np.savetxt(os.path.join(pos_folder, filename),pos_defs, delimiter=',')
     filename = 'negdefects%06d.txt' % image_num
@@ -112,19 +129,21 @@ def SaveDefects(filepath,pos_defs,neg_defs,image_num):
     
     return None
 
+#Assess errors in predictions. TP = true positive, FP = false positive
+#FN = false negative
 def PredictionStatistics(predictions,labels):
     
     diff = predictions-labels 
     errors = np.sum(0.5*np.sum(abs(diff),axis=1))
-    
+    #Assess accuracy for +1/2 defects
     pos_TP = np.intersect1d(np.argwhere(diff[:,0]==0),np.argwhere(predictions[:,0]==1))
     pos_FP = np.argwhere(diff[:,0]==1)
     pos_FN = np.argwhere(diff[:,0]==-1)
-
+    #Assess accuracy when no defect is present
     non_TP = np.intersect1d(np.argwhere(diff[:,1]==0),np.argwhere(predictions[:,1]==1))
     non_FP = np.argwhere(diff[:,1]==1)
     non_FN = np.argwhere(diff[:,1]==-1)
-
+    #Assess accuracy for -1/2 defects
     neg_TP = np.intersect1d(np.argwhere(diff[:,2]==0),np.argwhere(predictions[:,2]==1))
     neg_FP = np.argwhere(diff[:,2]==1)
     neg_FN = np.argwhere(diff[:,2]==-1)
@@ -135,11 +154,13 @@ def PredictionStatistics(predictions,labels):
     
     return accuracy,prediction_stats
 
+#Split available data into training and testing data
 def TrainTestSplit(nn_inputs,nn_labels):
-    train_inputs = nn_inputs[:int(np.ceil(0.9*len(nn_inputs))),:,:]
-    test_inputs = nn_inputs[int(np.ceil(0.9*len(nn_inputs))):,:,:]
-    train_labels = nn_labels[:int(np.ceil(0.9*len(nn_inputs))),:]
-    test_labels = nn_labels[int(np.ceil(0.9*len(nn_inputs))):,:]
+    train_prop = 0.9    #Proportion of inputs to use for training the model
+    train_inputs = nn_inputs[:int(np.ceil(train_prop*len(nn_inputs))),:,:]
+    test_inputs = nn_inputs[int(np.ceil(train_prop*len(nn_inputs))):,:,:]
+    train_labels = nn_labels[:int(np.ceil(train_prop*len(nn_inputs))),:]
+    test_labels = nn_labels[int(np.ceil(train_prop*len(nn_inputs))):,:]
     
     return train_inputs, test_inputs, train_labels, test_labels
 
@@ -199,7 +220,6 @@ def ROIFinder(file):
     grid_space = 0.2
     offset = 4
     xg, yg = np.mgrid[0:x_max:grid_space,0:y_max:grid_space]
-
     
     grid_t = GridDirectors(cell_data,xg,yg)
     S = SFinder(grid_t,offset)
@@ -261,8 +281,9 @@ def SFinder(grid_t,offset):
     return S
 
 def POIFinder(grid_t,S,offset):
+    S_th = 0.15     #Set threshold value of S for ROIs
     S_mask = np.zeros((np.size(S,0),np.size(S,1)),dtype=int)
-    S_mask[S < 0.15] = 1
+    S_mask[S < S_th] = 1
     labelled = skm.label(S_mask)
     roi = skm.regionprops(labelled)
     c = 0
@@ -302,6 +323,8 @@ def ROICropper(grid_t,poi,offset):
         
     return ROIs
 
+#Find defect orientation according to
+#Vromans and Giomi, Soft Matter, 2016, 12, 6490-6495
 def DefectOrientator(ROIs,k):
     grid_space = 0.2
     angles = np.zeros((np.size(ROIs,0),1))

@@ -22,7 +22,7 @@ dropout = 0.5                              #% of neurons to drop out in training
 initializer = 'glorot_normal'              #Distribution to initialise weights from
 l2_reg = tf.keras.regularizers.l2(l2=0.01) #Amount of L2 reg in dense layer
 save_model = False                         #Whether to save final trained model
-
+plotting = True                            #Whether to plot performance for each run
 #Load training and testing data
 ROIs = np.loadtxt('./nn_inputs.txt')
 ROI_labels = np.loadtxt('./nn_labels.txt')
@@ -43,19 +43,21 @@ boundaries = [int((np.size(ROI_labels,axis=0)/bs)*0.5*no_of_epochs)]
 values = [lr, 0.1*lr]
 lr_sched = tf.keras.optimizers.schedules.PiecewiseConstantDecay(boundaries, values)
 
-#Initial performance metrics
-val_accs = np.zeros((1,no_of_epochs))
-val_loss = np.zeros((1,no_of_epochs))
-accuracy =  np.zeros((runs,1));
-prediction_stats =  np.zeros((runs,6));
+#Initialise performance metrics
+val_accs = np.zeros((runs,no_of_epochs))   #Validation accuracy for each epoch
+val_loss = np.zeros((runs,no_of_epochs))   #Validation loss for each epoch
+accuracy =  np.zeros((runs,1));            #Test accuracy for each run
+prediction_stats =  np.zeros((runs,6));    #Various test prediction statistics
 
 #Loop through training runs, to get statistics on its accuracy
 for i in range(runs):
     trained_model, history = f.TrainModel(train_ROIs,train_labels,model,no_of_epochs,bs,lr_sched)
     val_accs[i,:] = history.history['val_accuracy']
     val_loss[i,:] = history.history['val_loss']
-    plt.plot(history.history['val_accuracy'])
-
+    #Plot training performance if desired
+    if plotting:
+        plt.plot(history.history['val_accuracy'])
+    #Evaluate test performance
     test_pred = f.MLPrediction(test_ROIs,trained_model)
     accuracy[i],prediction_stats[i,:] = f.PredictionStatistics(test_pred,test_labels)
 
@@ -65,10 +67,10 @@ test_stats = np.mean(prediction_stats,0)
 #Assess mean training performance
 training_performance = np.vstack((np.mean(val_accs,0),np.std(val_accs,0),np.mean(val_loss,0),np.std(val_loss,0)))
 
-#Assess winding number peroformance on training data
+#Assess winding number performance on training data
 winding_train_pred = f.WindingPrediction(train_ROIs)
 winding_train_accuracy,winding_test_stats = f.PredictionStatistics(winding_train_pred,train_labels)
-#Assess winding number perofrmance on test data
+#Assess winding number performance on test data
 winding_test_pred = f.WindingPrediction(test_ROIs)
 winding_test_accuracy,winding_test_stats = f.PredictionStatistics(winding_test_pred,test_labels)
 
