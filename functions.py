@@ -91,16 +91,12 @@ def MLPrediction(inputs,model):
 
 #Saving detected defects, update pos_folder and neg_folder if different locations
 #are desired.
-def SaveDefects(filepath,pos_defs,neg_defs,image_num):
-    
-    pos_folder = filepath + '/PosDefects'
-    neg_folder = filepath + '/NegDefects'   
-    #Add a larger buffer of zeros if > 1e6 images are being processed
+def SaveDefects(posdef_path,negdef_path,pos_defs,neg_defs,image_num):  
+    #Add a larger buffer of zeros. Needs to be increased if >1e7 images are being processed
     filename = 'posdefects%06d.txt' % image_num
-    np.savetxt(os.path.join(pos_folder, filename),pos_defs, delimiter=',')
+    np.savetxt(os.path.join(posdef_path, filename),pos_defs, delimiter=',')
     filename = 'negdefects%06d.txt' % image_num
-    np.savetxt(os.path.join(neg_folder, filename),neg_defs, delimiter=',')
-    
+    np.savetxt(os.path.join(negdef_path, filename),neg_defs, delimiter=',')
     return None
 
 #Assess errors in predictions. TP = true positive, FP = false positive
@@ -166,9 +162,9 @@ def EnlargeTrainingData(nn_inputs,nn_labels):
     return enlarged_inputs, enlarged_labels
 
 #Use a trained model to detect defects
-def DetectDefects(file,model,angles):
+def DetectDefects(file_w_path,model,grid_space,angles):
     #Find ROIs
-    POIs,ROIs = ROIFinder(file)
+    POIs,ROIs = ROIFinder(file,grid_space)
     #Classify ROIs using model
     label_prob = model.predict(ROIs,verbose=0)
     labels = np.eye(3,dtype=int)[np.argmax(label_prob,axis=1)]
@@ -180,26 +176,25 @@ def DetectDefects(file,model,angles):
         pos_ROIs = ROIs[labels[:,0]==1,:,:];
         neg_ROIs = ROIs[labels[:,2]==1,:,:];
         
-        pos_angles = DefectOrientator(pos_ROIs,0.5)
-        neg_angles = DefectOrientator(neg_ROIs,-0.5)
+        pos_angles = DefectOrientator(pos_ROIs,0.5,grid_space)
+        neg_angles = DefectOrientator(neg_ROIs,-0.5,grid_space)
     
         pos_defs = np.hstack((pos_defs,pos_angles))
         neg_defs = np.hstack((neg_defs,neg_angles))
     return pos_defs,neg_defs
 
 #Find ROIs
-def ROIFinder(file):
+def ROIFinder(file,grid_space):
     cell_data = np.loadtxt(file, delimiter = ',')
     cell_data[cell_data[:,2]<0,2] += np.pi
     
     x_max = max(cell_data[:,0])
     y_max = max(cell_data[:,1])
 
-    grid_space = 0.2
     offset = 4
     xg, yg = np.mgrid[0:x_max:grid_space,0:y_max:grid_space]
     #Interpolate data to grid (xg,yg) to obtain nematic field
-    grid_t = GridDirectors(cell_data,xg,yg)
+    grid_t = GridDirectors(cell_data,xg,yg,offset)
     #Find scalar order parameter at each grid point
     S = SFinder(grid_t,offset)
     #Find centres of mass of points of low S (points of interest)
@@ -212,14 +207,13 @@ def ROIFinder(file):
     
     return POIs,ROIs
 
-def GridDirectors(cell_data,xg,yg):
+def GridDirectors(cell_data,xg,yg,offset):
     #Interpolate cell data to fine grid, interpolating trig functions to ensure 
     #smooth variation
     grid_c2t = griddata(cell_data[:,:2],np.cos(2*cell_data[:,2]),(xg,yg), method='linear', fill_value=0)
     grid_s2t = griddata(cell_data[:,:2],np.sin(2*cell_data[:,2]),(xg,yg), method='linear', fill_value=0)
     
     ### Smooth data ###
-    offset = 4
     grid_c2t_smooth = np.zeros((np.size(grid_c2t,0),np.size(grid_c2t,1)))
     grid_s2t_smooth = np.zeros((np.size(grid_c2t,0),np.size(grid_c2t,1)))
     for i in range(np.size(grid_c2t,0)):
@@ -317,9 +311,8 @@ def ROICropper(grid_t,poi,offset):
 
 #Find defect orientation according to
 #Vromans and Giomi, Soft Matter, 2016, 12, 6490-6495
-def DefectOrientator(ROIs,k):
+def DefectOrientator(ROIs,k,grid_space):
     #k = defect topological charge
-    grid_space = 0.2
     angles = np.zeros((np.size(ROIs,0),1))
 
     for i in range(np.size(ROIs,0)):       
