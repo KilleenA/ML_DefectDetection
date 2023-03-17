@@ -162,7 +162,7 @@ def EnlargeTrainingData(nn_inputs,nn_labels):
     return enlarged_inputs, enlarged_labels
 
 #Use a trained model to detect defects
-def DetectDefects(file_w_path,model,grid_space,angles):
+def DetectDefects(file,model,grid_space,angles):
     #Find ROIs
     POIs,ROIs = ROIFinder(file,grid_space)
     #Classify ROIs using model
