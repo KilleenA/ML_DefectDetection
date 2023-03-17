@@ -89,32 +89,6 @@ def MLPrediction(inputs,model):
     
     return ML_pred
 
-def EvaluateModel(train_inputs,train_labels,test_inputs,test_labels,model,no_of_samples,no_of_epochs,bs,lr):
-    val_accuracy =  np.zeros((no_of_samples,no_of_epochs))
-    val_loss =  np.zeros((no_of_samples,no_of_epochs))
-    accuracy =  np.zeros((no_of_samples,1))
-    prediction_stats =  np.zeros((no_of_samples,6))
-    
-    for i in range(no_of_samples):
-        trained_model, history = TrainModel(train_inputs,train_labels,model,no_of_epochs,bs,lr)
-        
-        val_accuracy[i,:] = history.history['val_accuracy']
-        val_loss[i,:] = history.history['val_loss']
-        
-        test_pred = MLPrediction(test_inputs,trained_model)
-        accuracy[i],prediction_stats[i,:] = PredictionStatistics(test_pred,test_labels)
-        
-    mean_accuracy = np.mean(val_accuracy,0)
-    std_accuracy = np.std(val_accuracy,0)
-    mean_loss = np.mean(val_loss,0)
-    std_loss = np.std(val_loss,0)
-    
-    test_accuracy = np.mean(accuracy)
-    test_stats = np.mean(prediction_stats,0)
-    
-    training_performance = np.vstack((mean_accuracy,std_accuracy,mean_loss,std_loss))
-    return test_accuracy,test_stats,training_performance
-
 #Saving detected defects, update pos_folder and neg_folder if different locations
 #are desired.
 def SaveDefects(filepath,pos_defs,neg_defs,image_num):
@@ -164,6 +138,7 @@ def TrainTestSplit(nn_inputs,nn_labels):
     
     return train_inputs, test_inputs, train_labels, test_labels
 
+#Expand training data
 def EnlargeTrainingData(nn_inputs,nn_labels):
     #Rotation Enlargement
     enlarged_inputs = nn_inputs
@@ -190,15 +165,17 @@ def EnlargeTrainingData(nn_inputs,nn_labels):
     
     return enlarged_inputs, enlarged_labels
 
+#Use a trained model to detect defects
 def DetectDefects(file,model,angles):
+    #Find ROIs
     POIs,ROIs = ROIFinder(file)
-
+    #Classify ROIs using model
     label_prob = model.predict(ROIs,verbose=0)
     labels = np.eye(3,dtype=int)[np.argmax(label_prob,axis=1)]
-    
+    #Use labels to find coordinates of detected defects
     pos_defs = POIs[labels[:,0]==1,:];
     neg_defs = POIs[labels[:,2]==1,:];
-    
+    #Find the orientation of defects (if desired)
     if angles:
         pos_ROIs = ROIs[labels[:,0]==1,:,:];
         neg_ROIs = ROIs[labels[:,2]==1,:,:];
@@ -210,6 +187,7 @@ def DetectDefects(file,model,angles):
         neg_defs = np.hstack((neg_defs,neg_angles))
     return pos_defs,neg_defs
 
+#Find ROIs
 def ROIFinder(file):
     cell_data = np.loadtxt(file, delimiter = ',')
     cell_data[cell_data[:,2]<0,2] += np.pi
@@ -220,12 +198,14 @@ def ROIFinder(file):
     grid_space = 0.2
     offset = 4
     xg, yg = np.mgrid[0:x_max:grid_space,0:y_max:grid_space]
-    
+    #Interpolate data to grid (xg,yg) to obtain nematic field
     grid_t = GridDirectors(cell_data,xg,yg)
+    #Find scalar order parameter at each grid point
     S = SFinder(grid_t,offset)
+    #Find centres of mass of points of low S (points of interest)
     POI_indices = POIFinder(grid_t,S,offset)
     POIs = grid_space*POI_indices
-    
+    #Find ROIs, square sub-grid of the nematic field with POIs at their centre
     ROIs = ROICropper(grid_t,POI_indices,offset)
     ROIs[ROIs<-np.pi/2] += np.pi
     ROIs[ROIs>np.pi/2] -= np.pi
@@ -269,39 +249,50 @@ def GridDirectors(cell_data,xg,yg):
     
     return grid_t
 
+#Find scalar nematic order parameter at each point nematic field
 def SFinder(grid_t,offset):
     grid_c2t = np.cos(2*grid_t)
     grid_s2t = np.sin(2*grid_t)
 
     m = 2*offset + 1 #Size of smoothing window
+    #S field domain is 2*offset smaller than nematic field domain due to smoothing
+    #window. This stops the model searching for defects too close to the boundary
+    #(where things get very noisy
     S = np.zeros((np.size(grid_t,0) - (m-1), np.size(grid_t,1) - (m-1))); #Initialise S field
     for i in range(np.size(S,0)):
         for j in range(np.size(S,1)):
              S[i,j] = np.sqrt(np.nanmean(grid_c2t[i:i+(m-1),j:j+(m-1)])**2 + np.nanmean(grid_s2t[i:i+(m-1),j:j+(m-1)])**2)
     return S
 
+#Find centres of ROIs
 def POIFinder(grid_t,S,offset):
     S_th = 0.15     #Set threshold value of S for ROIs
     S_mask = np.zeros((np.size(S,0),np.size(S,1)),dtype=int)
+    #create mask and find contiguous regions of low S
     S_mask[S < S_th] = 1
     labelled = skm.label(S_mask)
-    roi = skm.regionprops(labelled)
-    c = 0
+    rois = skm.regionprops(labelled) 
     
-    for region in roi:
+    c = 0
+    for region in rois:
+        #Find region centroid
         x_c, y_c = region.centroid
         com = np.round(np.array([[x_c,y_c]]))
         com = com.astype(int)
+        #Don't take any ROIs at the edge of the domain
         if np.isnan(grid_t[com[0,0]-offset:com[0,0]+offset+1,com[0,1]-offset:com[0,1]+offset+1]).any() == True:
             continue
         elif np.shape(grid_t[com[0,0]-offset:com[0,0]+offset+1,com[0,1]-offset:com[0,1]+offset+1]) != (9,9):
             continue
         
+        #Add first centroid to POI list
         if c == 0:
             poi = com
             c = 1
             continue
-            
+        #Add other centroids to POI list
+        #But don't accept centroids too close to one another
+        #(this happens very rarely but including this makes the detection slightly cleaner)
         rel_dist = poi - com
         rel_mag = np.sqrt(rel_dist[:,0]**2 + rel_dist[:,1]**2)
         if rel_mag.any() < 1:
@@ -311,6 +302,7 @@ def POIFinder(grid_t,S,offset):
     poi = poi.astype(int) + offset
     return poi
 
+#Crop ROIs around POIs
 def ROICropper(grid_t,poi,offset):
     m = 2*offset + 1
     ROIs = np.zeros((np.size(poi,0),m,m))
@@ -326,6 +318,7 @@ def ROICropper(grid_t,poi,offset):
 #Find defect orientation according to
 #Vromans and Giomi, Soft Matter, 2016, 12, 6490-6495
 def DefectOrientator(ROIs,k):
+    #k = defect topological charge
     grid_space = 0.2
     angles = np.zeros((np.size(ROIs,0),1))
 
@@ -336,6 +329,7 @@ def DefectOrientator(ROIs,k):
         y0_inds = ROI[:,0]
         y2_inds = ROI[:,-1]
         
+        #Use central difference scheme to estimate gradients in Q across ROI
         dQxxdx = (np.mean(np.cos(2*x2_inds)) - np.mean(np.cos(2*x0_inds)))/(2*grid_space)
         dQxydy = (np.mean(np.sin(2*y2_inds)) - np.mean(np.sin(2*y0_inds)))/(2*grid_space)
         dQxydx = (np.mean(np.sin(2*x2_inds)) - np.mean(np.sin(2*x0_inds)))/(2*grid_space)
