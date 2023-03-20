@@ -243,7 +243,7 @@ def GridDirectors(cell_data,xg,yg,offset):
     
     return grid_t
 
-#Find scalar nematic order parameter at each point nematic field
+#Find scalar nematic order parameter at each point in the nematic field
 def SFinder(grid_t,offset):
     grid_c2t = np.cos(2*grid_t)
     grid_s2t = np.sin(2*grid_t)
@@ -255,6 +255,7 @@ def SFinder(grid_t,offset):
     S = np.zeros((np.size(grid_t,0) - (m-1), np.size(grid_t,1) - (m-1))); #Initialise S field
     for i in range(np.size(S,0)):
         for j in range(np.size(S,1)):
+            #This is equivalent to finding the largest eigenvalue of the nematic tensor 
              S[i,j] = np.sqrt(np.nanmean(grid_c2t[i:i+(m-1),j:j+(m-1)])**2 + np.nanmean(grid_s2t[i:i+(m-1),j:j+(m-1)])**2)
     return S
 
