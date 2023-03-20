@@ -192,7 +192,7 @@ def ROIFinder(file,grid_space):
     y_max = max(cell_data[:,1])
 
     offset = 4
-    xg, yg = np.mgrid[0:x_max:grid_space,0:y_max:grid_space]
+    yg, xg = np.mgrid[0:y_max:grid_space,0:x_max:grid_space]
     #Interpolate data to grid (xg,yg) to obtain nematic field
     grid_t = GridDirectors(cell_data,xg,yg,offset)
     #Find scalar order parameter at each grid point
