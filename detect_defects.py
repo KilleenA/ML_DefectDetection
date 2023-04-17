@@ -38,7 +38,7 @@ for i,file in enumerate(files):
     file_w_path = os.path.join(data_filepath, file)
     pos_defs,neg_defs = f.DetectDefects(file_w_path,model,grid_space,angles)
     f.SaveDefects(posdef_path,negdef_path,pos_defs,neg_defs,i)
-       
+    
     if i%20 == 0:
         print('Detected defects in '+str(i)+' files')
     

@@ -72,9 +72,9 @@ def WindingPrediction(inputs):
         
         #Update classification matrix
         if winding == -0.5:
-            winding_pred[i,2] = 1
-        elif winding == 0.5:
             winding_pred[i,0] = 1
+        elif winding == 0.5:
+            winding_pred[i,2] = 1
         else:
             winding_pred[i,1] = 1
             
@@ -169,12 +169,12 @@ def DetectDefects(file,model,grid_space,angles):
     label_prob = model.predict(ROIs,verbose=0)
     labels = np.eye(3,dtype=int)[np.argmax(label_prob,axis=1)]
     #Use labels to find coordinates of detected defects
-    pos_defs = POIs[labels[:,0]==1,:];
-    neg_defs = POIs[labels[:,2]==1,:];
+    pos_defs = POIs[labels[:,2]==1,:];
+    neg_defs = POIs[labels[:,0]==1,:];
     #Find the orientation of defects (if desired)
     if angles:
-        pos_ROIs = ROIs[labels[:,0]==1,:,:];
-        neg_ROIs = ROIs[labels[:,2]==1,:,:];
+        pos_ROIs = ROIs[labels[:,2]==1,:,:];
+        neg_ROIs = ROIs[labels[:,0]==1,:,:];
         
         pos_angles = DefectOrientator(pos_ROIs,0.5,grid_space)
         neg_angles = DefectOrientator(neg_ROIs,-0.5,grid_space)
@@ -318,10 +318,14 @@ def DefectOrientator(ROIs,k,grid_space):
 
     for i in range(np.size(ROIs,0)):       
         ROI = ROIs[i,:,:];    
-        x0_inds = ROI[0,:]
-        x2_inds = ROI[-1,:]
-        y0_inds = ROI[:,0]
-        y2_inds = ROI[:,-1]
+        #x0_inds = ROI[0,:]
+        #x2_inds = ROI[-1,:]
+        #y0_inds = ROI[:,0]
+        #y2_inds = ROI[:,-1]
+        y0_inds = ROI[0,:]
+        y2_inds = ROI[-1,:]
+        x0_inds = ROI[:,0]
+        x2_inds = ROI[:,-1]
         
         #Use central difference scheme to estimate gradients in Q across ROI
         dQxxdx = (np.mean(np.cos(2*x2_inds)) - np.mean(np.cos(2*x0_inds)))/(2*grid_space)
