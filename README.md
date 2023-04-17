@@ -9,4 +9,6 @@ A folder with example input data, generated using an Active Vertex Model (AVM) [
 
 In addition to using the trained model, different models can be built, trained and tested using 'train_and_test_model', which uses 'nn_inputs' and correpsonding 'nn_labels' to train and test the model. These preprocessed inputs were obtained from AVM simulations.
 
+The detected defects can also be plotted, along with the coordinates of the cells' centre of mass and orientation of their long-axes, using the 'defect_plotting.gnu'. This requires the installation of plotting software gnuplot (freely available at: https://sourceforge.net/projects/gnuplot/).
+
 [1] Andrew Killeen, Thibault Bertrand, Chiu Fan Lee, Polar Fluctuations Lead to Extensile Nematic Behavior in Confluent Tissues, Physical Review Letters, 128, 078001 (2022).
