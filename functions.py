@@ -64,7 +64,7 @@ def WindingPrediction(inputs):
         #Find the change in angle between adjacent elements
         alpha_1 = np.roll(alpha_0,1)
         #Correct any values that are not the shortest change in angle
-        d_alpha = alpha_1 - alpha_0
+        d_alpha = alpha_0 - alpha_1
         d_alpha[d_alpha<-np.pi/2] += np.pi
         d_alpha[d_alpha>np.pi/2] -= np.pi
         #Sum these changes to get the total winding number
@@ -204,7 +204,9 @@ def ROIFinder(file,grid_space):
     ROIs = ROICropper(grid_t,POI_indices,offset)
     ROIs[ROIs<-np.pi/2] += np.pi
     ROIs[ROIs>np.pi/2] -= np.pi
-    
+    #first coordinate is currently the row number, which is the y coordinate, 
+    #so switch indices so they're in the form [x, y]
+    POIs = np.fliplr(POIs)
     return POIs,ROIs
 
 def GridDirectors(cell_data,xg,yg,offset):
@@ -243,7 +245,7 @@ def GridDirectors(cell_data,xg,yg,offset):
     
     return grid_t
 
-#Find scalar nematic order parameter at each point in the nematic field
+#Find scalar nematic order parameter at each point nematic field
 def SFinder(grid_t,offset):
     grid_c2t = np.cos(2*grid_t)
     grid_s2t = np.sin(2*grid_t)
@@ -255,7 +257,6 @@ def SFinder(grid_t,offset):
     S = np.zeros((np.size(grid_t,0) - (m-1), np.size(grid_t,1) - (m-1))); #Initialise S field
     for i in range(np.size(S,0)):
         for j in range(np.size(S,1)):
-            #This is equivalent to finding the largest eigenvalue of the nematic tensor 
              S[i,j] = np.sqrt(np.nanmean(grid_c2t[i:i+(m-1),j:j+(m-1)])**2 + np.nanmean(grid_s2t[i:i+(m-1),j:j+(m-1)])**2)
     return S
 
@@ -295,6 +296,7 @@ def POIFinder(grid_t,S,offset):
         else:
             poi = np.vstack((poi,com))
     poi = poi.astype(int) + offset
+
     return poi
 
 #Crop ROIs around POIs
@@ -318,14 +320,11 @@ def DefectOrientator(ROIs,k,grid_space):
 
     for i in range(np.size(ROIs,0)):       
         ROI = ROIs[i,:,:];    
-        #x0_inds = ROI[0,:]
-        #x2_inds = ROI[-1,:]
-        #y0_inds = ROI[:,0]
-        #y2_inds = ROI[:,-1]
-        y0_inds = ROI[0,:]
-        y2_inds = ROI[-1,:]
+
         x0_inds = ROI[:,0]
         x2_inds = ROI[:,-1]
+        y0_inds = ROI[0,:]
+        y2_inds = ROI[-1,:]
         
         #Use central difference scheme to estimate gradients in Q across ROI
         dQxxdx = (np.mean(np.cos(2*x2_inds)) - np.mean(np.cos(2*x0_inds)))/(2*grid_space)
@@ -338,3 +337,4 @@ def DefectOrientator(ROIs,k,grid_space):
         angles[i] = (k/(1-k))*np.arctan2(np.mean(numer),np.mean(denom))
 
     return angles
+
