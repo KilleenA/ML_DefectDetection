@@ -10,9 +10,9 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 
 runs = 50                                  #Number of training runs to perform
-no_of_epochs = 20                          #Number of epochs to train for
+no_of_epochs = 30                          #Number of epochs to train for
 bs = 64                                    #Batch size for SGD batches
-lr = 0.05                                  #Initial learning rate
+lr = 0.025                                  #Initial learning rate
 conv_layers = 2                            #Number of convolution layers
 features = [32,32]                         #Number of features in each layer
 win_size = [6,3]                           #Window size of each layer
@@ -40,7 +40,7 @@ model = f.BuildCNN(conv_layers,features,win_size,dense_layers,dense_size,dropout
 step = tf.Variable(0, trainable=False)
 #Define change in lr to be halfway through training
 boundaries = [int((np.size(ROI_labels,axis=0)/bs)*0.5*no_of_epochs)]
-values = [lr, 0.1*lr]
+values = [lr, 0.2*lr]
 lr_sched = tf.keras.optimizers.schedules.PiecewiseConstantDecay(boundaries, values)
 
 #Initialise performance metrics
