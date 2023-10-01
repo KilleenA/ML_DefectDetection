@@ -19,6 +19,7 @@ import os
 import functions as f
 from tensorflow import keras
 
+origin = 'Bottom Left' #Set origin as in either 'Bottom Left' or 'Top Left' of images
 grid_space = 0.2                            #Choose spacing of interpolation grid
 data_filepath = './CellFiles'               #Location of experimental data files
 save_filepath = './DefectFiles'             #Path to where defect folders will be located
@@ -36,7 +37,7 @@ files = [file for file in sorted(os.listdir(data_filepath))]
 #Detect defects
 for i,file in enumerate(files):
     file_w_path = os.path.join(data_filepath, file)
-    pos_defs,neg_defs = f.DetectDefects(file_w_path,model,grid_space,angles)
+    pos_defs,neg_defs = f.DetectDefects(file_w_path,origin,model,grid_space,angles)
     f.SaveDefects(posdef_path,negdef_path,pos_defs,neg_defs,i)
     
     if i%20 == 0:
