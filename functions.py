@@ -162,9 +162,9 @@ def EnlargeTrainingData(nn_inputs,nn_labels):
     return enlarged_inputs, enlarged_labels
 
 #Use a trained model to detect defects
-def DetectDefects(file,model,grid_space,angles):
+def DetectDefects(file,origin,model,grid_space,angles):
     #Find ROIs
-    POIs,ROIs = ROIFinder(file,grid_space)
+    POIs,ROIs = ROIFinder(file,origin,grid_space)
     #Classify ROIs using model
     label_prob = model.predict(ROIs,verbose=0)
     labels = np.eye(3,dtype=int)[np.argmax(label_prob,axis=1)]
@@ -184,10 +184,13 @@ def DetectDefects(file,model,grid_space,angles):
     return pos_defs,neg_defs
 
 #Find ROIs
-def ROIFinder(file,grid_space):
+def ROIFinder(file,origin,grid_space):
     cell_data = np.loadtxt(file, delimiter = ',')
     cell_data[cell_data[:,2]<0,2] += np.pi
-    
+
+    if origin == 'Top Left':
+        cell_data[:,1] = np.max(cell_data[:,1]) - cell_data[:,1]
+            
     x_max = max(cell_data[:,0])
     y_max = max(cell_data[:,1])
 
@@ -291,7 +294,7 @@ def POIFinder(grid_t,S,offset):
         #(this happens very rarely but including this makes the detection slightly cleaner)
         rel_dist = poi - com
         rel_mag = np.sqrt(rel_dist[:,0]**2 + rel_dist[:,1]**2)
-        if rel_mag.any() < 1:
+        if any(rel_mag < 8)::
             continue
         else:
             poi = np.vstack((poi,com))
