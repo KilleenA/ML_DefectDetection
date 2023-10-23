@@ -3,8 +3,8 @@
 """
 Script for using model and detecting defects. Input data files should be saved in 
 a folder called 'CellFiles' (or 'data_filepath' should appropriately changed), with each 
-file being a as a comma separated text file where each line contains the x, y
-and orientation angle of each cell. 
+file being a as a comma separated text file where each line contains the x and y coordinates,
+as well as the orientation angle of each cell in radians. 
 
 x and y coordinates should be scaled such that one length unit corresponds to the 
 characteristic length of one cell. 
